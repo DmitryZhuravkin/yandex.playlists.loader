@@ -24,9 +24,6 @@ function processPlayLists(playlists) {
     let promisses = playlists
         .filter(playlist => playlist.trackCount > 0)
         .map(playlist => {
-
-            
-
             return yandexMusicAPIManager.getUserPlaylistTracks(config.username, playlist.kind)
         });
 
@@ -37,35 +34,37 @@ function processPlayListWithTracks(playlistsWithTracks) {
     let trackInfoItems = [];
 
     playlistsWithTracks.forEach(element => {
+        var directory = `${config.destinationFolder}/${element.title}`;
+
+        if (!fs.existsSync(directory)) {
+            fs.mkdirSync(directory);
+        }
+
         element.tracks
             .forEach(track => {
-                trackInfoItems.push({
-                    playlist: element.title,
-                    fileName: `${track.artists[0].name} - ${track.title}.mp3`.replace(/[?~^:*<>=_]/gi, ''),
-                    storageDir: track.storageDir
-                })
+                var fileName = `${track.artists[0].name} - ${track.title}.mp3`.replace(/[?~^:*<>=_]/gi, '');
+                var fileLocation = `${directory}/${fileName}`;
+
+                if (!fs.existsSync(fileLocation)) {
+                    trackInfoItems.push({
+                        playlist: element.title,
+                        fileLocation: fileLocation,
+                        storageDir: track.storageDir
+                    });
+                }
             })
     });
 
-    let promisses = trackInfoItems
-        //.filter(trackInfoItem => ) check for existing file
-        .map(trackInfo => {
-            return yandexMusicAPIManager.modifyTrackWithDonwloadUrl(trackInfo)
-        });
+    let promisses = trackInfoItems.map(trackInfo => {
+        return yandexMusicAPIManager.modifyTrackWithDonwloadUrl(trackInfo)
+    });
 
     return Promise.all(promisses);
 }
 
 function donwloadTracks(downloadRequest) {
     var promisses = downloadRequest.map(context => {
-        var directory = `${config.destinationFolder}/${context.playlist}`;
-        var fileLocation = `${directory}/${context.fileName}`;
-
-        if (!fs.existsSync(directory)) {
-            fs.mkdirSync(directory);
-        }
-
-        return downloadFile(fileLocation, context.downloadUrl);
+        return downloadFile(context.fileLocation, context.downloadUrl);
     });
 
     return Promise.all(promisses);
