@@ -15,7 +15,9 @@ if (cluster.isMaster) {
     yandexMusicAPIManager.getUserPlaylists(config.username)
         .then(processPlayLists)
         .then(processPlayListWithTracks)
-        .then(donwloadTracks);
+        .then(donwloadTracks)
+        .then(response => logger.log('DONE'))
+        .catch(error => logger.log(`ERROR: ${error}`));
 } else {
     processWorker();
 }
@@ -42,7 +44,7 @@ function processPlayListWithTracks(playlistsWithTracks) {
 
         element.tracks
             .forEach(track => {
-                var fileName = `${track.artists[0].name} - ${track.title}.mp3`.replace(/[?~^:*<>=_]/gi, '');
+                var fileName = `${track.artists[0].name} - ${track.title}.mp3`.replace(/[?~^:*<>=_/\\|]/gi, '');
                 var fileLocation = `${directory}/${fileName}`;
 
                 if (!fs.existsSync(fileLocation)) {
