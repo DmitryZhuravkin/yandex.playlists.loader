@@ -1,35 +1,33 @@
 'use strict';
 
-const cluster = require('cluster');
 const os = require('os');
 const fs = require('fs');
+const Promise = require("bluebird");
 
 const config = require('./config.json');
-const logger = require('./infrastructure/logger');
 const downloadFile = require('./infrastructure/download-helper');
 const YandexMusicAPIManager = require('./yandex.api/yandex.music.api');
 
 const yandexMusicAPIManager = new YandexMusicAPIManager();
 
-if (cluster.isMaster) {
-    yandexMusicAPIManager.getUserPlaylists(config.username)
-        .then(processPlayLists)
-        .then(processPlayListWithTracks)
-        .then(donwloadTracks)
-        .then(response => logger.log('DONE'))
-        .catch(error => logger.log(`ERROR: ${error}`));
-} else {
-    processWorker();
-}
+console.log('[starting]');
+console.log(`[loading playlists] [${config.username}]`);
+
+yandexMusicAPIManager.getUserPlaylists(config.username)
+    .then(processPlayLists)
+    .then(processPlayListWithTracks)
+    .then(donwloadTracks)
+    .then(onSuccess)
+    .catch(onError);
+
+// functions
 
 function processPlayLists(playlists) {
-    let promisses = playlists
-        .filter(playlist => playlist.trackCount > 0)
-        .map(playlist => {
-            return yandexMusicAPIManager.getUserPlaylistTracks(config.username, playlist.kind)
-        });
-
-    return Promise.all(promisses);
+    return Promise.map(playlists
+        .filter(playlist => playlist.trackCount > 0), playlist => {
+            console.log(`[loading tracks] [${playlist.title}]`);
+            return yandexMusicAPIManager.getUserPlaylistTracks(config.username, playlist.kind);
+        }, { concurrency: config.concurrency });
 }
 
 function processPlayListWithTracks(playlistsWithTracks) {
@@ -44,7 +42,7 @@ function processPlayListWithTracks(playlistsWithTracks) {
 
         element.tracks
             .forEach(track => {
-                var fileName = `${track.artists[0].name} - ${track.title}.mp3`.replace(/[?~^:*<>=_/\\|]/gi, '');
+                var fileName = `${track.artists[0].name} - ${track.title}.mp3`.replace(/[?~^:*<>=_|\\/]/gi, '');
                 var fileLocation = `${directory}/${fileName}`;
 
                 if (!fs.existsSync(fileLocation)) {
@@ -57,53 +55,23 @@ function processPlayListWithTracks(playlistsWithTracks) {
             })
     });
 
-    let promisses = trackInfoItems.map(trackInfo => {
-        return yandexMusicAPIManager.modifyTrackWithDonwloadUrl(trackInfo)
-    });
-
-    return Promise.all(promisses);
+    return Promise.map(trackInfoItems, trackInfo => {
+        return yandexMusicAPIManager.modifyTrackWithDonwloadUrl(trackInfo);
+    }, { concurrency: config.concurrency });
 }
 
 function donwloadTracks(downloadRequest) {
-    var promisses = downloadRequest.map(context => {
-        return downloadFile(context.fileLocation, context.downloadUrl);
-    });
-
-    return Promise.all(promisses);
-
-    //let cpusCount = os.cpus().length;
-    //let environmentVariablesForWorkers = new Array(cpusCount);
-
-    // for (let i = 0; i < environmentVariablesForWorkers.length; i++) {
-    //     environmentVariablesForWorkers[i] = [];
-    // }
-
-    // downloadRequest.forEach((itemToDownload, index) => {
-    //     let i = index % cpusCount;
-
-    //     environmentVariablesForWorkers[i].push(itemToDownload);
-    // });
-
-    // downloadRequest.forEach((itemToDownload, index) => {
-    //     let i = index % cpusCount;
-
-    //     environmentVariablesForWorkers[i].push(itemToDownload);
-    // });
-
-    // TODO: use something else to communicate with worker
-    // environmentVariablesForWorkers.forEach(context => {
-    //     let worker = cluster.fork({
-    //         "tracks": JSON.stringify(context)
-    //     });        
-    // });
+    return Promise.map(downloadRequest, request => {
+        return downloadFile(request.fileLocation, request.downloadUrl)
+    }, { concurrency: config.concurrency });
 }
 
-function processWorker() {
-
-    var tracks = JSON.parse(process.env["tracks"]);
-
-    tracks.forEach(item => {
-        logger.log(`${item.playlist}:${item.downloadUrl}`);
-    });
+function onSuccess(response) {
+    console.log('----------------------------------------------------------------\r\n[finished] [success]');
+    process.exit();
 }
 
+function onError(response) {
+    console.log(`----------------------------------------------------------------\r\n[finished] [error] [${response}]`);
+    process.exit();
+}

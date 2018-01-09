@@ -1,4 +1,5 @@
 {
     "username":"d.zhuravkin",
-    "destinationFolder":"e:/music"
+    "destinationFolder":"e:/music",
+    "concurrency": 20
 }

@@ -3,14 +3,17 @@
   "version": "1.0.0",
   "description": "Script to load user`s playlists from yandex music",
   "main": "app.js",
+  "repository": {
+    "url": "https://github.com/DmitryZhuravkin/yandex.playlists.loader.git"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Dmitry.Zhuravkin",
   "license": "ISC",
   "dependencies": {
+    "bluebird": "^3.5.1",
     "md5": "^2.2.1",
-    "request": "^2.83.0",
     "restler": "^3.4.0",
     "xml2js": "^0.4.19"
   }

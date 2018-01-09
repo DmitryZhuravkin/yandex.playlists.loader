@@ -2,60 +2,44 @@
 
 const fs = require('fs');
 const http = require('http');
-const logger = require('./logger');
+const Promise = require("bluebird");
 
 function downloadFile(fileLocation, url) {
     return new Promise((resolve, reject) => {
         try {
             let file = fs.createWriteStream(fileLocation, {
-                flags:'w',
+                flags: 'w',
                 autoClose: true
             });
 
-            logger.log(`Downloading ${fileLocation}.`);
+            console.log(`[download] [start] [${fileLocation}]`);
 
-            // 1
-            let request = http.get(url, function (response) {
+            let request = http.get(url, response => {
+
+                response.on('error', error => {
+                    console.log(`[download] [error] [${fileLocation}] [${error}]`);
+                    resolve(false);
+                });
+
                 response.pipe(file);
+
                 file.on('finish', function () {
                     file.close(() => {
-                        logger.log(`Downloading ${fileLocation}. SUCCESS.`);
-                        resolve(`Download ${fileLocation}: SUCCESS.`);
+                        console.log(`[download] [success] [${fileLocation}]`);
+                        resolve(true);
                     });
                 });
             });
 
             request.on('error', error => {
-                resolve(`Download ${fileLocation}: FAILED. ${error.message}`);
-            }).end();
+                console.log(`[download] [error] [${fileLocation}] [${error}]`);
+                resolve(false);
+            });
 
-            // 2
-            // http.get(url, res => {
-
-            //     const { statusCode } = res;
-            //     const contentType = res.headers['content-type'];
-
-            //     let error;
-            //     if (statusCode !== 200) {
-            //         error = new Error(`Request Failed. Status Code: ${statusCode}.`);
-            //     }
-
-            //     if (error) {
-            //         resolve(`Download ${fileLocation}: FAILED. ${error.message}`);
-            //         return;
-            //     }
-
-            //     res.on('data', data => {
-            //         file.write(data);
-            //     }).on('end', function () {
-            //         file.end();
-            //         resolve(`Download ${fileLocation}: SUCCESS.`);
-            //     }).on('error', (e) => {
-            //         resolve(`Download ${fileLocation}: FAILED. ${error.message}`);
-            //     });
-            // });
+            request.end();
         } catch (error) {
-            resolve(`Download ${fileLocation}: FAILED. ${error.message}`);
+            console.log(`[download] [error] [${fileLocation}] [${error}]`);
+            resolve(false);
         }
     });
 }

@@ -5,6 +5,7 @@ const BASE_URL = 'https://music.yandex.ru';
 const xml2js = require('xml2js');
 const rest = require('restler');
 const md5 = require('md5');
+const Promise = require("bluebird");
 
 class YandexMusicAPIManager {
 
