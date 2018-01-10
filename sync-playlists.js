@@ -11,7 +11,7 @@ const YandexMusicAPIManager = require('./yandex.api/yandex.music.api');
 const yandexMusicAPIManager = new YandexMusicAPIManager();
 
 console.log('[starting]');
-console.log(`[loading playlists] [${config.username}]`);
+console.log(`[loading playlists] [user: ${config.username}]`);
 
 yandexMusicAPIManager.getUserPlaylists(config.username)
     .then(processPlayLists)
@@ -25,7 +25,7 @@ yandexMusicAPIManager.getUserPlaylists(config.username)
 function processPlayLists(playlists) {
     return Promise.map(playlists
         .filter(playlist => playlist.trackCount > 0), playlist => {
-            console.log(`[loading tracks] [${playlist.title}]`);
+            console.log(`[loading playlist tracks] [playlist: ${playlist.title}]`);
             return yandexMusicAPIManager.getUserPlaylistTracks(config.username, playlist.kind);
         }, { concurrency: config.concurrency });
 }
@@ -61,17 +61,21 @@ function processPlayListWithTracks(playlistsWithTracks) {
 }
 
 function donwloadTracks(downloadRequest) {
+    console.log(`[loading tracks] [count: ${downloadRequest.length}]`);
     return Promise.map(downloadRequest, request => {
         return downloadFile(request.fileLocation, request.downloadUrl)
     }, { concurrency: config.concurrency });
 }
 
 function onSuccess(response) {
-    console.log('----------------------------------------------------------------\r\n[finished] [success]');
+    let successCount = response.filter(c => { return c }).length;
+    let errorCount = response.filter(c => { return !c }).length;
+
+    console.log(`----------------------------------------------------------------\r\n[finished] [success: ${successCount}] [error: ${errorCount}]`);
     process.exit();
 }
 
-function onError(response) {
-    console.log(`----------------------------------------------------------------\r\n[finished] [error] [${response}]`);
+function onError(error) {
+    console.log(`----------------------------------------------------------------\r\n[finished] [error] [${error}]`);
     process.exit();
 }
