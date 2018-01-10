@@ -3,6 +3,7 @@
 const os = require('os');
 const fs = require('fs');
 const Promise = require("bluebird");
+const rimraf = require('rimraf');
 
 const config = require('./config.json');
 const downloadFile = require('./infrastructure/download-helper');
@@ -13,7 +14,8 @@ const yandexMusicAPIManager = new YandexMusicAPIManager();
 console.log('[starting]');
 console.log(`[loading playlists] [user: ${config.username}]`);
 
-yandexMusicAPIManager.getUserPlaylists(config.username)
+clearPlaylistForNewTracks()
+    .then(loadUserPlaylists)
     .then(processPlayLists)
     .then(processPlayListWithTracks)
     .then(donwloadTracks)
@@ -21,6 +23,38 @@ yandexMusicAPIManager.getUserPlaylists(config.username)
     .catch(onError);
 
 // functions
+
+function clearPlaylistForNewTracks() {
+    return new Promise((resolve, reject) => {
+        try {
+            var playlistForNewTracks = getPlaylistNameForNewFiles();
+
+            if (playlistForNewTracks) {
+                fs.exists(playlistForNewTracks, exists => {
+                    if (exists) {
+                        // remove non-empty directory
+                        rimraf(playlistForNewTracks, () => {
+                            resolve(true);
+                        });
+                    }
+                    else {
+                        resolve(true);
+                    }
+                });
+            }
+            else {
+                resolve(true);
+            }
+        } catch (error) {
+            console.log(`[clearplaylistfornewtracks] [warn] [${error}]`);
+            resolve(false);// resolve in any case
+        }
+    });
+}
+
+function loadUserPlaylists(response) {
+    return yandexMusicAPIManager.getUserPlaylists(config.username);
+}
 
 function processPlayLists(playlists) {
     return Promise.map(playlists
@@ -34,7 +68,9 @@ function processPlayListWithTracks(playlistsWithTracks) {
     let trackInfoItems = [];
 
     playlistsWithTracks.forEach(element => {
-        var directory = `${config.destinationFolder}/${element.title}`;
+        let directory = `${config.destinationFolder}/${element.title}`;
+        let playlistForNewTracks = getPlaylistNameForNewFiles();
+        let isDownloadRequired = false;
 
         if (!fs.existsSync(directory)) {
             fs.mkdirSync(directory);
@@ -44,15 +80,25 @@ function processPlayListWithTracks(playlistsWithTracks) {
             .forEach(track => {
                 var fileName = `${track.artists[0].name} - ${track.title}.mp3`.replace(/[?~^:*<>=_|\\/]/gi, '');
                 var fileLocation = `${directory}/${fileName}`;
+                var copyLocation = playlistForNewTracks ? `${playlistForNewTracks}/${fileName}` : undefined;
 
                 if (!fs.existsSync(fileLocation)) {
                     trackInfoItems.push({
                         playlist: element.title,
                         fileLocation: fileLocation,
+                        copyLocation: copyLocation,
                         storageDir: track.storageDir
                     });
+
+                    isDownloadRequired = true;
                 }
-            })
+            });
+
+        if (isDownloadRequired && playlistForNewTracks) {
+            if (!fs.existsSync(playlistForNewTracks)) {
+                fs.mkdirSync(playlistForNewTracks);
+            }
+        }
     });
 
     return Promise.map(trackInfoItems, trackInfo => {
@@ -60,11 +106,23 @@ function processPlayListWithTracks(playlistsWithTracks) {
     }, { concurrency: config.concurrency });
 }
 
+// function loadingDownloadURLs(trackInfoItems) {
+//     return Promise.map(trackInfoItems, trackInfo => {
+//         return yandexMusicAPIManager.modifyTrackWithDonwloadUrl(trackInfo);
+//     }, { concurrency: config.concurrency });
+// }
+
 function donwloadTracks(downloadRequest) {
     console.log(`[loading tracks] [count: ${downloadRequest.length}]`);
     return Promise.map(downloadRequest, request => {
-        return downloadFile(request.fileLocation, request.downloadUrl)
+        return downloadFile(request.fileLocation, request.copyLocation, request.downloadUrl)
     }, { concurrency: config.concurrency });
+}
+
+function getPlaylistNameForNewFiles() {
+    if (config.newPlaylistName) {
+        return `${config.destinationFolder}/${config.newPlaylistName}`;
+    }
 }
 
 function onSuccess(response) {

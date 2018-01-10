@@ -1,5 +1,6 @@
 {
     "username":"d.zhuravkin",
     "destinationFolder":"e:/music",
-    "concurrency": 20
+    "concurrency": 20,
+    "newPlaylistName": "new"
 }

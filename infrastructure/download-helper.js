@@ -4,7 +4,7 @@ const fs = require('fs');
 const http = require('http');
 const Promise = require("bluebird");
 
-function downloadFile(fileLocation, url) {
+function downloadFile(fileLocation, copyLocation, url) {
     return new Promise((resolve, reject) => {
         try {
             let file = fs.createWriteStream(fileLocation, {
@@ -26,7 +26,16 @@ function downloadFile(fileLocation, url) {
                 file.on('finish', function () {
                     file.close(() => {
                         console.log(`[download] [success] [${fileLocation}]`);
-                        resolve(true);
+
+                        if (copyLocation) {
+                            fs.copyFile(fileLocation, copyLocation, () => {
+
+                                resolve(true);
+                            });
+                        }
+                        else {
+                            resolve(true);
+                        }
                     });
                 });
             });
