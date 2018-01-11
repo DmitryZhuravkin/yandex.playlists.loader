@@ -66,11 +66,11 @@ function processPlayLists(playlists) {
 
 function processPlayListWithTracks(playlistsWithTracks) {
     let trackInfoItems = [];
+    let playlistForNewTracks = getPlaylistNameForNewFiles();
+    let isDownloadRequired = false;
 
     playlistsWithTracks.forEach(element => {
         let directory = `${config.destinationFolder}/${element.title}`;
-        let playlistForNewTracks = getPlaylistNameForNewFiles();
-        let isDownloadRequired = false;
 
         if (!fs.existsSync(directory)) {
             fs.mkdirSync(directory);
@@ -93,13 +93,13 @@ function processPlayListWithTracks(playlistsWithTracks) {
                     isDownloadRequired = true;
                 }
             });
-
-        if (isDownloadRequired && playlistForNewTracks) {
-            if (!fs.existsSync(playlistForNewTracks)) {
-                fs.mkdirSync(playlistForNewTracks);
-            }
-        }
     });
+
+    if (isDownloadRequired && playlistForNewTracks) {
+        if (!fs.existsSync(playlistForNewTracks)) {
+            fs.mkdirSync(playlistForNewTracks);
+        }
+    }
 
     return Promise.map(trackInfoItems, trackInfo => {
         return yandexMusicAPIManager.modifyTrackWithDonwloadUrl(trackInfo);
